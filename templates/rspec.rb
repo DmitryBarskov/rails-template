@@ -56,3 +56,7 @@ file "spec/rails_helper.rb", <<~RUBY.strip_heredoc
     config.filter_rails_from_backtrace!
   end
 RUBY
+
+append_to_file ".gitignore" do
+  "\nspec/examples.txt\n"
+end
