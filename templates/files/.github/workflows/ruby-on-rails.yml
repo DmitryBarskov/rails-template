@@ -19,7 +19,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install Ruby and gems
-        uses: ruby/setup-ruby
+        uses: ruby/setup-ruby@v1.99.0
         with:
           bundler-cache: true
       - name: Set up database schema
