@@ -24,7 +24,7 @@ end
 
 if File.exist?("spec/rails_helper.rb")
   insert_into_file "spec/rails_helper.rb", before: 'require "rspec/rails"' do
-    "require \"spec/support/simplecov.rb\"\n"
+    "require \"support/simplecov.rb\"\n"
   end
 end
 
