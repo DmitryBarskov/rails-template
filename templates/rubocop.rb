@@ -28,6 +28,10 @@ file ".rubocop.yml", <<~YAML.strip_heredoc
   AllCops:
     NewCops: enable
 
+  I18n/GetText/DecorateString:
+    Exclude:
+      - spec/**/*.rb
+
   I18n/RailsI18n/DecorateString:
     Exclude:
       - spec/**/*.rb
