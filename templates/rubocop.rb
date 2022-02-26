@@ -28,12 +28,20 @@ file ".rubocop.yml", <<~YAML.strip_heredoc
   AllCops:
     NewCops: enable
 
+  I18n/RailsI18n/DecorateString:
+    Exclude:
+      - spec/**/*.rb
+
   Style/Documentation:
     Enabled: false
 
   Style/StringLiterals:
     EnforcedStyle: double_quotes
 YAML
+
+append_to_file ".gitattributes" do
+  "\nbin/rubocop linguist-generated\n"
+end
 
 run "bundle binstubs rubocop"
 run "bin/rubocop -A"
