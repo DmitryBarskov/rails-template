@@ -1,5 +1,5 @@
 ## Summary
-Resolves issue #N.
+Resolves #\<Number of issue\>.
 
 Brief description of the PR.
 
