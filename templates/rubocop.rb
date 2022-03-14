@@ -49,5 +49,5 @@ end
 
 run "bundle binstubs rubocop"
 
-count_of_files = Dir["**/*"].length
-run "bin/rubocop --auto-gen-config --auto-gen-only-exclude --exclude-limit #{count_of_files}"
+files_count = Dir["app/**/*", "lib/**/*", "spec/**/*", "test/**/*", "config/**/*"].length
+run "bin/rubocop --auto-gen-config --auto-gen-only-exclude --exclude-limit #{files_count}"
