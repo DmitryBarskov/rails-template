@@ -48,4 +48,6 @@ append_to_file ".gitattributes" do
 end
 
 run "bundle binstubs rubocop"
-run "bin/rubocop -A"
+
+files_count = Dir["app/**/*", "lib/**/*", "spec/**/*", "test/**/*", "config/**/*"].length
+run "bin/rubocop --auto-gen-config --auto-gen-only-exclude --exclude-limit #{files_count}"
