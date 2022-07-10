@@ -4,10 +4,12 @@ def source_paths
   [__dir__]
 end
 
+rails_root = File.basename(destination_root)
+
 file "Dockerfile", <<~DOCKERFILE
   FROM ruby:#{RUBY_VERSION}-alpine
 
-  ARG RAILS_ROOT=/#{File.basename(destination_root)}
+  ARG RAILS_ROOT=/#{rails_root}
   ARG PACKAGES="bash build-base tzdata gcompat #{'postgresql-dev' if defined? PG}#{'sqlite-dev' if defined? SQLite3}"
   ARG BUNDLER_VERSION="#{Bundler::VERSION}"
   ENV BUNDLE_PATH="/bundle_cache"
@@ -39,7 +41,7 @@ if defined? SQLite3
       web:
         build: .
         volumes:
-          - .:/#{File.basename(destination_root)}:cached
+          - .:/#{rails_root}:cached
           - bundle_cache:/bundle_cache
           - db_data:/db
         ports:
@@ -64,7 +66,7 @@ if defined? PG
       web:
         build: .
         volumes:
-          - .:/#{File.basename(destination_root)}:cached
+          - .:/#{rails_root}:cached
           - bundle_cache:/bundle_cache
         ports:
           - 3000:3000
