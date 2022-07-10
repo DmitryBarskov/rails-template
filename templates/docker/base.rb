@@ -4,42 +4,95 @@ def source_paths
   [__dir__]
 end
 
-copy_file(
-  "files/Dockerfile",
-  "Dockerfile"
-)
+file "Dockerfile", <<~DOCKERFILE
+  FROM ruby:#{RUBY_VERSION}-alpine
 
-rails_root = File.basename(destination_root)
-ruby_version = File.readlines(".ruby-version", chomp: true).first if File.exist?(".ruby-version")
-ruby_version ||= "3.1.1"
-bundler_version = File.readlines("Gemfile.lock", chomp: true).last.strip
-packages = %w[bash build-base tzdata gcompat]
-packages << "postgresql-dev" if defined? PG
-packages << "sqlite-dev" if defined? SQLite3
+  ARG RAILS_ROOT=/#{File.basename(destination_root)}
+  ARG PACKAGES="bash build-base tzdata gcompat #{'postgresql-dev' if defined? PG}#{'sqlite-dev' if defined? SQLite3}"
+  ARG BUNDLER_VERSION="#{Bundler::VERSION}"
+  ENV BUNDLE_PATH="/bundle_cache"
+  ENV GEM_HOME="/bundle_cache"
+  ENV GEM_PATH="/bundle_cache"
 
-gsub_file "Dockerfile", "{$RUBY_VERSION}", ruby_version
-gsub_file "Dockerfile", "{$BUNDLER_VERSION}", bundler_version
-gsub_file "Dockerfile", "{$RAILS_ROOT}", rails_root
-gsub_file "Dockerfile", "{$PACKAGES}", packages.join(" ")
+  RUN apk update \
+   && apk upgrade \
+   && apk add --update --no-cache $PACKAGES
 
+  WORKDIR $RAILS_ROOT
+
+  RUN gem install bundler:$BUNDLER_VERSION
+  COPY Gemfile Gemfile.lock ./
+  RUN bundle install --jobs 5
+
+  ADD . $RAILS_ROOT
+  ENV PATH=$RAILS_ROOT/bin:${PATH}
+
+  EXPOSE 3000
+  CMD bundle exec rails server -b 0.0.0.0
+DOCKERFILE
+
+if defined? SQLite3
+  file "docker-compose.yml", <<~YAML
+    version: "3.7"
+
+    services:
+      web:
+        build: .
+        volumes:
+          - .:/#{File.basename(destination_root)}:cached
+          - bundle_cache:/bundle_cache
+          - db_data:/db
+        ports:
+          - 3000:3000
+        environment:
+          PIDFILE: /tmp/pids/server.pid
+        tmpfs:
+          - /tmp/pids/
+
+    volumes:
+      bundle_cache:
+      db_data:
+  YAML
+end
 if defined? PG
-  copy_file(
-    "files/docker-compose.yml",
-    "docker-compose.yml"
-  )
-  gsub_file "docker-compose.yml", "{$RAILS_ROOT}", rails_root
-
   db_version = ActiveRecord::Base.connection.select_value("SELECT VERSION()")[/\d+\.\d+/]
-  db_username = "postgres"
-  db_password = "postgres"
-  db_image = "postgres:#{db_version}-alpine"
-  db_volume = "var/lib/postgresql/data/pgdata"
-  db_ports = "5432:5432"
-  db_env = <<~YAML
-    POSTGRES_USER: postgres
+
+  file "docker-compose.yml", <<~YAML
+    version: "3.7"
+
+    services:
+      web:
+        build: .
+        volumes:
+          - .:/#{File.basename(destination_root)}:cached
+          - bundle_cache:/bundle_cache
+        ports:
+          - 3000:3000
+        depends_on:
+          - db
+        environment:
+          DATABASE_HOST: db
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
+          PIDFILE: /tmp/pids/server.pid
+        tmpfs:
+          - /tmp/pids/
+
+      db:
+        image: postgres:#{db_version}-alpine
+        volumes:
+          - db_data:/var/lib/postgresql/data/pgdata
+        ports:
+          - 5432:5432
+        environment:
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      bundle_cache:
+      db_data:
   YAML
+
   insert_into_file "config/database.yml", before: "\ndevelopment:" do
     <<~YAML
       \s\susername: <%= ENV["DATABASE_USERNAME"] %>
@@ -47,20 +100,6 @@ if defined? PG
       \s\shost: <%= ENV["DATABASE_HOST"] %>
     YAML
   end
-
-  gsub_file "docker-compose.yml", "{$DB_USERNAME}", db_username
-  gsub_file "docker-compose.yml", "{$DB_PASSWORD}", db_password
-  gsub_file "docker-compose.yml", "{$DB_IMAGE}", db_image
-  gsub_file "docker-compose.yml", "{$DB_VOLUME}", db_volume
-  gsub_file "docker-compose.yml", "{$DB_PORTS}", db_ports
-  gsub_file "docker-compose.yml", "{$DB_ENV}", db_env
-end
-if defined? SQLite3
-  copy_file(
-    "files/docker-compose-sqlite.yml",
-    "docker-compose.yml"
-  )
-  gsub_file "docker-compose.yml", "{$RAILS_ROOT}", rails_root
 end
 
 run "docker-compose build"
