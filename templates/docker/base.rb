@@ -5,12 +5,19 @@ def source_paths
 end
 
 rails_root = File.basename(destination_root)
+additional_packages = if defined? PG
+                        "postgresql-dev"
+                      elsif defined? SQLite3
+                        "sqlite-dev"
+                      else
+                        ""
+                      end
 
 file "Dockerfile", <<~DOCKERFILE
   FROM ruby:#{RUBY_VERSION}-alpine
 
   ARG RAILS_ROOT=/#{rails_root}
-  ARG PACKAGES="bash build-base tzdata gcompat #{'postgresql-dev' if defined? PG}#{'sqlite-dev' if defined? SQLite3}"
+  ARG PACKAGES="bash build-base tzdata gcompat #{additional_packages}"
   ARG BUNDLER_VERSION="#{Bundler::VERSION}"
   ENV BUNDLE_PATH="/bundle_cache"
   ENV GEM_HOME="/bundle_cache"
