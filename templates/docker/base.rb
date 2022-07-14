@@ -85,13 +85,15 @@ if defined? PG
     }
   }
 
-  insert_into_file "config/database.yml", after: /default: &default\n(?: +.+\n)*/ do
-    <<~YAML
-      \s\susername: <%= ENV["DATABASE_USERNAME"] %>
-      \s\spassword: <%= ENV["DATABASE_PASSWORD"] %>
-      \s\shost: <%= ENV["DATABASE_HOST"] %>
-    YAML
-  end
+  db_config = [{
+    "username" => '<%= ENV["DATABASE_USERNAME"] %>',
+    "password" => '<%= ENV["DATABASE_PASSWORD"] %>',
+    "host" => '<%= ENV["DATABASE_HOST"] %>'
+  }]
+
+  insert_into_file "config/database.yml",
+                   " #{db_config.to_yaml[5..]}",
+                   after: /default: &default\n(?: +.+\n)*/
 end
 
 file "docker-compose.yml", compose_config.to_yaml[4..]
