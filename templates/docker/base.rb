@@ -67,9 +67,7 @@ if defined? PG
   db_version = ActiveRecord::Base.connection.select_value("SELECT VERSION()")[/\d+\.\d+/]
 
   compose_config["services"]["web"]["depends_on"] = ["db"]
-  compose_config["services"]["web"]["environment"]["DATABASE_HOST"] = "db"
-  compose_config["services"]["web"]["environment"]["DATABASE_USERNAME"] = "postgres"
-  compose_config["services"]["web"]["environment"]["DATABASE_PASSWORD"] = "postgres"
+  compose_config["services"]["web"]["environment"]["DATABASE_URL"] = "postgres://postgres:postgres@db"
 
   compose_config["services"]["db"] = {
     "image" => "postgres:#{db_version}-alpine",
@@ -83,19 +81,9 @@ if defined? PG
       "PGDATA" => "/var/lib/postgresql/data/pgdata"
     }
   }
-
-  db_config = [{
-    "username" => '<%= ENV["DATABASE_USERNAME"] %>',
-    "password" => '<%= ENV["DATABASE_PASSWORD"] %>',
-    "host" => '<%= ENV["DATABASE_HOST"] %>'
-  }]
-
-  insert_into_file "config/database.yml",
-                   db_config.to_yaml.gsub("---\n-", " "),
-                   after: /default: &default\n(?: +.+\n)*/
 end
 
-file "docker-compose.yml", compose_config.to_yaml.gsub("---\n", "")
+file "docker-compose.yml", compose_config.to_yaml
 
 run "docker-compose build"
 run "docker-compose exec web bin/rails db:prepare"
