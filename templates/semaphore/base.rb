@@ -102,4 +102,4 @@ if semaphore_config["blocks"].empty?
   "
 end
 
-file ".semaphore/semaphore.yml", semaphore_config.to_yaml.gsub("---\n", "")
+file ".semaphore/semaphore.yml", semaphore_config.to_yaml
