@@ -6,7 +6,6 @@ def source_paths
   [__dir__]
 end
 
-rails_root = "app"
 packages = %w[bash build-base tzdata gcompat]
 packages << "postgresql-dev" if defined? PG
 packages << "sqlite-dev" if defined? SQLite3
@@ -14,7 +13,7 @@ packages << "sqlite-dev" if defined? SQLite3
 file "Dockerfile", <<~DOCKERFILE
   FROM ruby:#{RUBY_VERSION}-alpine
 
-  ARG RAILS_ROOT=/#{rails_root}
+  ARG RAILS_ROOT=/app
   ARG PACKAGES="#{packages.join(' ')}"
   ARG BUNDLER_VERSION="#{Bundler::VERSION}"
   ENV BUNDLE_PATH="/bundle_cache"
@@ -44,7 +43,7 @@ compose_config = {
     "web" => {
       "build" => ".",
       "volumes" => [
-        ".:/#{rails_root}:cached",
+        ".:/app:cached",
         "bundle_cache:/bundle_cache"
       ],
       "ports" => ["3000:3000"],
