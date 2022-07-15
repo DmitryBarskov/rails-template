@@ -91,11 +91,11 @@ if defined? PG
   }]
 
   insert_into_file "config/database.yml",
-                   " #{db_config.to_yaml[5..]}",
+                   db_config.to_yaml.gsub("---\n-", " "),
                    after: /default: &default\n(?: +.+\n)*/
 end
 
-file "docker-compose.yml", compose_config.to_yaml[4..]
+file "docker-compose.yml", compose_config.to_yaml.gsub("---\n", "")
 
 run "docker-compose build"
 run "docker-compose exec web bin/rails db:prepare"
