@@ -6,7 +6,7 @@ def source_paths
   [__dir__]
 end
 
-rails_root = File.basename(destination_root)
+rails_root = "app"
 packages = %w[bash build-base tzdata gcompat]
 packages << "postgresql-dev" if defined? PG
 packages << "sqlite-dev" if defined? SQLite3
