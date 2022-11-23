@@ -35,10 +35,11 @@ semaphore_config = {
       "commands" => [
         "checkout",
         "cache restore",
+        defined?(PG) && "sem-service start postgres",
         "sem-version ruby #{RUBY_VERSION}",
         "bundle install",
         "cache store"
-      ]
+      ].select(&:itself)
     }
   },
   "blocks" => [
@@ -49,8 +50,9 @@ semaphore_config = {
           {
             "name" => "Run tests",
             "commands" => [
-              "bundle exec rails db:setup"
-            ]
+              "bundle exec rails db:setup",
+              gem_installed?("rspec-rails") && "bundle exec rspec"
+            ].select(&:itself)
           }
         ]
       }
@@ -61,7 +63,11 @@ semaphore_config = {
         "jobs" => [
           {
             "name" => "Run quality",
-            "commands" => []
+            "commands" => [
+              gem_installed?("bundler-audit") && "bundle exec bundler-audit --update",
+              gem_installed?("brakeman") && "bundle exec brakeman",
+              gem_installed?("rubocop") && "bundle exec rubocop --parallel"
+            ].select(&:itself)
           }
         ]
       }
@@ -69,37 +75,7 @@ semaphore_config = {
   ]
 }
 
-if defined? PG
-  semaphore_config["global_job_config"]["prologue"]["commands"].insert(2, "sem-service start postgres")
-end
-
-if gem_installed? "rspec-rails"
-  semaphore_config["blocks"][0]["task"]["jobs"][0]["commands"] << "bundle exec rspec"
-else
-  semaphore_config["blocks"].shift
-end
-
-quality_gems = {
-  "bundler-audit" => "bundle exec bundler-audit --update",
-  "brakeman" => "bundle exec brakeman",
-  "rubocop" => "bundle exec rubocop  --parallel"
-}
-
-quality_gems.each_pair do |gem, command|
-  if gem_installed? gem
-    semaphore_config["blocks"][-1]["task"]["jobs"][0]["commands"] << command
-  end
-end
-
-if semaphore_config["blocks"][-1]["task"]["jobs"][0]["commands"].empty?
-  semaphore_config["blocks"].pop
-end
-
-if semaphore_config["blocks"].empty?
-  raise ScriptError, "
-    You don't have any of required gems.
-    Install one or feel free to open issue: https://github.com/DmitryBarskov/rails-template/issues/new/choose
-  "
-end
+linter_commands = semaphore_config["blocks"][1]["task"]["jobs"][0]["commands"]
+semaphore_config["blocks"].pop if linter_commands.empty?
 
 file ".semaphore/semaphore.yml", semaphore_config.to_yaml
