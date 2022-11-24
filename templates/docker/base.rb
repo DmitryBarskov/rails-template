@@ -63,27 +63,33 @@ compose_config = {
 
 compose_config["services"]["web"]["volumes"] << "db_data:/db" if defined? SQLite3
 
-if defined? PG
-  db_version = ActiveRecord::Base.connection.select_value("SELECT VERSION()")[/\d+\.\d+/]
+begin
+  if defined? PG
+    db_version = ENV["DB_VERSION"] || ActiveRecord::Base.connection.select_value("SELECT VERSION()")[/\d+\.\d+/]
+    db_url = "postgres://postgres:postgres@db"
 
-  compose_config["services"]["web"]["depends_on"] = ["db"]
-  compose_config["services"]["web"]["environment"]["DATABASE_URL"] = "postgres://postgres:postgres@db"
+    compose_config["services"]["web"]["depends_on"] = ["db"]
+    compose_config["services"]["web"]["environment"]["DATABASE_URL"] = db_url
 
-  compose_config["services"]["db"] = {
-    "image" => "postgres:#{db_version}-alpine",
-    "volumes" => [
-      "db_data:/var/lib/postgresql/data/pgdata"
-    ],
-    "ports" => ["5432:5432"],
-    "environment" => {
-      "POSTGRES_USER" => "postgres",
-      "POSTGRES_PASSWORD" => "postgres",
-      "PGDATA" => "/var/lib/postgresql/data/pgdata"
+    compose_config["services"]["db"] = {
+      "image" => "postgres:#{db_version}-alpine",
+      "volumes" => [
+        "db_data:/var/lib/postgresql/data/pgdata"
+      ],
+      "ports" => ["5432:5432"],
+      "environment" => {
+        "POSTGRES_USER" => "postgres",
+        "POSTGRES_PASSWORD" => "postgres",
+        "PGDATA" => "/var/lib/postgresql/data/pgdata"
+      }
     }
-  }
+
+    insert_into_file "config/database.yml", "  url: #{db_url}", after: /default: &default\n(?: +.+\n)*/
+  end
+rescue PG::ConnectionBad
+  puts "Can't connect to the database. The db service will not be installed.\nYou can specify the database version by specifying DB_VERSION=<PG version>"
 end
 
 file "docker-compose.yml", compose_config.to_yaml
 
-run "docker-compose build"
-run "docker-compose exec web bin/rails db:prepare"
+run "docker-compose up --build && docker-compose exec web bin/rails db:prepare"
