@@ -47,6 +47,7 @@ compose_config = {
         "bundle_cache:/bundle_cache"
       ],
       "ports" => ["3000:3000"],
+      "command" => "bin/docker-entrypoint",
       "environment" => {
         "PIDFILE" => "/tmp/pids/server.pid"
       },
@@ -92,4 +93,7 @@ end
 
 file "docker-compose.yml", compose_config.to_yaml
 
-run "docker-compose up --build && docker-compose exec web bin/rails db:prepare"
+copy_file "files/docker-entrypoint", "bin/docker-entrypoint"
+run "chmod +x bin/docker-entrypoint"
+
+run "docker-compose up --build"
