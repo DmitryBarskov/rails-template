@@ -2,6 +2,14 @@
 
 require "yaml"
 
+def gem_installed?(gem_name)
+  require gem_name
+
+  true
+rescue LoadError
+  false
+end
+
 def setup_ruby_steps
   [
     {
@@ -10,14 +18,14 @@ def setup_ruby_steps
     },
     {
       "name" => "Install Ruby and gems",
-      "uses" => "ruby/setup-ruby@1.99.0",
+      "uses" => "ruby/setup-ruby@v1",
       "with" => { "bundler-cache" => true }
     }
   ]
 end
 
 def rspec_job
-  return {} unless defined?(RSpec)
+  return {} unless gem_installed?('rspec') || gem_installed?('rspec-rails')
 
   {
     "rspec" => {
@@ -28,7 +36,7 @@ def rspec_job
           "image" => "postgres:11-alpine",
           "ports" => ["5432:5432"],
           "env" => {
-            "POSTGRES_DB" => "test_db",
+            "POSTGRES_DB" => "#{app_name}_test",
             "POSTGRES_USER" => "actions",
             "POSTGRES_PASSWORD" => "password"
           }
@@ -36,7 +44,9 @@ def rspec_job
       },
       "env" => {
         "RAILS_ENV" => "test",
-        "DATABASE_URL" => "postgres://actions:password@localhost:5432/test_db"
+        "DATABASE_HOST" => "localhost",
+        "DATABASE_PORT" => 5432,
+        "DATABASE_URL" => "postgres://actions:password@localhost:5432/#{app_name}_test"
       },
       "steps" => [
         *setup_ruby_steps,
@@ -46,7 +56,7 @@ def rspec_job
         },
         {
           "name" => "Run tests",
-          "run" => "bin/rspec"
+          "run" => "bundle exec rspec"
         }
       ]
     }
@@ -54,7 +64,7 @@ def rspec_job
 end
 
 def security_job
-  return {} unless defined?(Bundler::Audit) || defined?(Brakeman)
+  return {} unless gem_installed?('bundler/audit') || gem_installed?('brakeman')
 
   {
     "security" => {
@@ -62,21 +72,25 @@ def security_job
       "runs-on" => "ubuntu-latest",
       "steps" => [
         *setup_ruby_steps,
-        {
-          "name" => "Security audit dependencies",
-          "run" => "bundle exec bundler-audit --update"
-        } if defined?(Bundler::Audit),
-        {
-          "name" => "Security audit application code",
-          "run" => "bundle exec brakeman -q -w2"
-        } if defined?(Brakeman)
+        if gem_installed?('bundler/audit')
+          {
+            "name" => "Security audit dependencies",
+            "run" => "bundle exec bundler-audit --update"
+          }
+        end,
+        if gem_installed?('brakeman')
+          {
+            "name" => "Security audit application code",
+            "run" => "bundle exec brakeman -q -w2"
+          }
+        end
       ].compact
     }
   }
 end
 
-def lint_job
-  return {} unless defined? Rubocop
+def rubocop_job
+  return {} unless gem_installed?('rubocop')
 
   {
     "rubocop" => {
@@ -92,7 +106,6 @@ def lint_job
     }
   }
 end
-
 
 actions_config = {
   "name" => "Ruby on Rails CI",
@@ -111,3 +124,4 @@ actions_config = {
 github_actions_yaml = actions_config.to_yaml
 
 file ".github/workflows/ruby-on-rails.yml", github_actions_yaml
+bundle_command "lock --add-platform x86_64-linux"
