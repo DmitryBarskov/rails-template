@@ -2,24 +2,26 @@
 
 require "yaml"
 
-required_steps = [
-  {
-    "name" => "Checkout code",
-    "uses" => "actions/checkout@v2"
-  },
-  {
-    "name" => "Install Ruby and gems",
-    "uses" => "ruby/setup-ruby@1.99.0",
-    "with" => { "bundler-cache" => true }
-  }
-]
+def setup_ruby_steps
+  [
+    {
+      "name" => "Checkout code",
+      "uses" => "actions/checkout@v2"
+    },
+    {
+      "name" => "Install Ruby and gems",
+      "uses" => "ruby/setup-ruby@1.99.0",
+      "with" => { "bundler-cache" => true }
+    }
+  ]
+end
 
-actions_config = {
-  "name" => "Ruby on Rails CI",
-  "run-name" => "Ruby on Rails CI on ${{ github.ref_name }}",
-  "on" => ["push"],
-  "jobs" => {
-    "test" => {
+def rspec_job
+  return {} unless defined?(RSpec)
+
+  {
+    "rspec" => {
+      "name" => "Tests",
       "runs-on" => "ubuntu-latest",
       "services" => {
         "postgres" => {
@@ -37,7 +39,7 @@ actions_config = {
         "DATABASE_URL" => "postgres://actions:password@localhost:5432/test_db"
       },
       "steps" => [
-        *required_steps,
+        *setup_ruby_steps,
         {
           "name" => "Setup database",
           "run" => "bin/rails db:setup"
@@ -47,25 +49,62 @@ actions_config = {
           "run" => "bin/rspec"
         }
       ]
-    },
-    "lint" => {
+    }
+  }
+end
+
+def security_job
+  return {} unless defined?(Bundler::Audit) || defined?(Brakeman)
+
+  {
+    "security" => {
+      "name" => "Vulnerability scan",
       "runs-on" => "ubuntu-latest",
       "steps" => [
-        *required_steps,
+        *setup_ruby_steps,
         {
           "name" => "Security audit dependencies",
-          "run" => "bin/bundler-audit --update"
-        },
+          "run" => "bundle exec bundler-audit --update"
+        } if defined?(Bundler::Audit),
         {
           "name" => "Security audit application code",
-          "run" => "bin/brakeman -q -w2"
-        },
+          "run" => "bundle exec brakeman -q -w2"
+        } if defined?(Brakeman)
+      ].compact
+    }
+  }
+end
+
+def lint_job
+  return {} unless defined? Rubocop
+
+  {
+    "rubocop" => {
+      "name" => "Lint",
+      "runs-on" => "ubuntu-latest",
+      "steps" => [
+        *setup_ruby_steps,
         {
           "name" => "Lint Ruby files",
-          "run" => "bin/rubocop --parallel"
+          "run" => "bundle exec rubocop --parallel"
         }
       ]
     }
+  }
+end
+
+
+actions_config = {
+  "name" => "Ruby on Rails CI",
+  "run-name" => "Ruby on Rails CI on ${{ github.ref_name }}",
+  "on" => {
+    "push" => { "branches" => %w[main] },
+    "pull_request" => nil
+  },
+  "jobs" => {
+    **rspec_job,
+    **security_job,
+    **rubocop_job,
   }
 }
 
